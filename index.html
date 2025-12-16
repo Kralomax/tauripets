@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TauriPets - Battle Pet Collection Tracker</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🐉 TauriPets</h1>
+            <p class="subtitle">Battle Pet Collection Tracker for TauriWoW</p>
+            <p class="disclaimer">⚠️ Unofficial fan project · Not affiliated with TauriWoW or Crystalsong staff</p>
+            <div class="header-buttons">
+                <a href="https://github.com/Kralomax/tauripets/releases/latest" class="download-btn" target="_blank">📦 Download Addon</a>
+                <a href="https://github.com/Kralomax/tauripets" class="github-btn" target="_blank">⭐ GitHub</a>
+            </div>
+        </header>
+
+        <!-- Tab Navigation -->
+        <div class="tab-nav">
+            <button class="tab-btn active" data-tab="my-collection">📦 My Collection</button>
+            <button class="tab-btn" data-tab="all-pets">📚 All Pets Database</button>
+            <button class="tab-btn" data-tab="leaderboard">🏆 Leaderboard</button>
+        </div>
+
+        <!-- My Collection Tab -->
+        <div id="my-collection" class="tab-content active">
+            <div class="upload-area" id="uploadArea">
+                <h2>📁 Load Your Collection</h2>
+                <div style="margin-bottom: 15px;">
+                    <button class="upload-toggle active" id="toggleFile" onclick="showFileUpload()">Upload File</button>
+                    <button class="upload-toggle" id="togglePaste" onclick="showPasteArea()">Paste Data</button>
+                </div>
+                <div id="fileSection">
+                    <p>Drag & drop your <strong>.lua</strong> file here</p>
+                    <p class="file-path">📂 WTF/Account/YOURNAME/SavedVariables/</p>
+                    <input type="file" id="fileInput" accept=".lua,.bak">
+                    <button class="upload-btn" onclick="document.getElementById('fileInput').click()">Choose File</button>
+                </div>
+                <div id="pasteSection" style="display: none;">
+                    <p>In-game: Type <strong>/tpets copy</strong> → Press <strong>Ctrl+A</strong> then <strong>Ctrl+C</strong> → Paste below:</p>
+                    <textarea id="pasteInput" placeholder="Paste your TAURIPETS data here..."></textarea>
+                    <button class="upload-btn" onclick="processPastedData()">Load Collection</button>
+                </div>
+            </div>
+
+            <div class="player-info" id="playerInfo">
+                <h2 id="playerName">Player Name</h2>
+                <div class="export-date" id="exportDate">Exported: --</div>
+            </div>
+
+            <div class="score-display" id="scoreDisplay">
+                <div class="score-label">🏆 PET SCORE</div>
+                <div class="score-value" id="scoreValue">0</div>
+                <div class="score-breakdown">
+                    <div class="score-part">Quality: <span id="scoreQuality">0</span></div>
+                    <div class="score-part">Levels: <span id="scoreLevels">0</span></div>
+                    <div class="score-part">Bonuses: <span id="scoreBonuses">0</span></div>
+                </div>
+            </div>
+
+            <div class="achievements" id="achievementsSection">
+                <h3>🎖️ Achievements Unlocked</h3>
+                <div class="achievement-list" id="achievementList"></div>
+            </div>
+
+            <div class="progress-container" id="progressContainer">
+                <div class="progress-bar">
+                    <div class="progress-fill" id="progressFill"></div>
+                    <div class="progress-text" id="progressText">0%</div>
+                </div>
+            </div>
+
+            <div class="stats-dashboard" id="statsDashboard">
+                <div class="stat-card"><div class="value" id="totalPets">0</div><div class="label">Total Pets</div></div>
+                <div class="stat-card"><div class="value" id="level25Pets">0</div><div class="label">Level 25</div></div>
+                <div class="stat-card rare"><div class="value" id="rarePets">0</div><div class="label">Rare+</div></div>
+                <div class="stat-card epic"><div class="value" id="epicPets">0</div><div class="label">Epic+</div></div>
+                <div class="stat-card"><div class="value" id="favoritePets">0</div><div class="label">⭐ Favorites</div></div>
+            </div>
+
+            <div class="filters" id="myFilters" style="display: none;">
+                <div class="filter-group">
+                    <label>Search</label>
+                    <input type="text" id="mySearchInput" placeholder="Pet name...">
+                </div>
+                <div class="filter-group">
+                    <label>Quality</label>
+                    <select id="myQualityFilter">
+                        <option value="">All</option>
+                        <option value="2">Uncommon+</option>
+                        <option value="3">Rare+</option>
+                        <option value="4">Epic+</option>
+                    </select>
+                </div>
+                <div class="filter-group">
+                    <label>Level</label>
+                    <select id="myLevelFilter">
+                        <option value="">All</option>
+                        <option value="25">Level 25</option>
+                        <option value="20">Level 20+</option>
+                        <option value="10">Level 10+</option>
+                    </select>
+                </div>
+                <div class="filter-group">
+                    <label>Family</label>
+                    <select id="myFamilyFilter">
+                        <option value="">All Families</option>
+                        <option value="1">Humanoid</option>
+                        <option value="2">Dragonkin</option>
+                        <option value="3">Flying</option>
+                        <option value="4">Undead</option>
+                        <option value="5">Critter</option>
+                        <option value="6">Magic</option>
+                        <option value="7">Elemental</option>
+                        <option value="8">Beast</option>
+                        <option value="9">Aquatic</option>
+                        <option value="10">Mechanical</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="pet-count" id="myPetCount"></div>
+            <div class="pet-grid" id="myPetGrid"></div>
+            <div class="no-results" id="myNoResults">No pets match your filters</div>
+        </div>
+
+        <!-- All Pets Database Tab -->
+        <div id="all-pets" class="tab-content">
+            <div class="filters">
+                <div class="filter-group">
+                    <label>Search</label>
+                    <input type="text" id="allSearchInput" placeholder="Pet name...">
+                </div>
+                <div class="filter-group">
+                    <label>Zone</label>
+                    <select id="allZoneFilter"><option value="">All Zones</option></select>
+                </div>
+                <div class="filter-group">
+                    <label>Source</label>
+                    <select id="allSourceFilter">
+                        <option value="">All Sources</option>
+                        <option value="wild">Wild</option>
+                        <option value="vendor">Vendor</option>
+                        <option value="drop">Drop</option>
+                        <option value="quest">Quest</option>
+                        <option value="achievement">Achievement</option>
+                        <option value="profession">Profession</option>
+                        <option value="promotion">Promotion</option>
+                        <option value="event">World Event</option>
+                        <option value="tcg">TCG</option>
+                    </select>
+                </div>
+                <div class="filter-group">
+                    <label>Family</label>
+                    <select id="allFamilyFilter">
+                        <option value="">All Families</option>
+                        <option value="1">Humanoid</option>
+                        <option value="2">Dragonkin</option>
+                        <option value="3">Flying</option>
+                        <option value="4">Undead</option>
+                        <option value="5">Critter</option>
+                        <option value="6">Magic</option>
+                        <option value="7">Elemental</option>
+                        <option value="8">Beast</option>
+                        <option value="9">Aquatic</option>
+                        <option value="10">Mechanical</option>
+                    </select>
+                </div>
+                <div class="filter-group checkbox-group">
+                    <input type="checkbox" id="showMissingOnly">
+                    <label for="showMissingOnly">Show Missing Only</label>
+                </div>
+            </div>
+            <div class="pet-count" id="allPetCount">Loading pet database...</div>
+            <div class="pet-grid" id="allPetGrid"></div>
+            <div class="no-results" id="allNoResults">No pets match your filters</div>
+        </div>
+
+        <!-- Leaderboard Tab -->
+        <div id="leaderboard" class="tab-content">
+            <div class="leaderboard-container">
+                <div class="leaderboard-header">
+                    <h2>🏆 TauriPets Leaderboard</h2>
+                    <p>Top pet collectors on TauriWoW</p>
+                </div>
+
+                <div class="personal-best-card empty" id="personalBestCard">
+                    <h3>📊 Your Personal Best</h3>
+                    <div id="personalBestContent">
+                        <p style="color: #666; margin: 20px 0;">Load your collection to see your score!</p>
+                    </div>
+                </div>
+
+                <div class="leaderboard-table-container">
+                    <h3>🌟 Top Collectors</h3>
+                    <table class="leaderboard-table" id="leaderboardTable">
+                        <thead>
+                            <tr>
+                                <th>Rank</th>
+                                <th>Player</th>
+                                <th>Score</th>
+                                <th>Pets</th>
+                                <th>Lv 25</th>
+                                <th>Date</th>
+                            </tr>
+                        </thead>
+                        <tbody id="leaderboardBody"></tbody>
+                    </table>
+                    <div class="leaderboard-empty" id="leaderboardEmpty">
+                        <p>🏆 No scores submitted yet!</p>
+                        <p>Be the first to claim the top spot.</p>
+                    </div>
+                </div>
+
+                <div class="how-it-works">
+                    <h4>📋 How It Works</h4>
+                    <ol>
+                        <li>Load your collection in the <strong>My Collection</strong> tab</li>
+                        <li>Your personal best is automatically saved locally</li>
+                        <li>Click <strong>"Submit to Leaderboard"</strong> to compete</li>
+                    </ol>
+                </div>
+
+                <div class="scoring-formula">
+                    <h4>🏆 Scoring Formula</h4>
+                    <div class="formula-section">
+                        <span class="formula-title">Quality Points</span>
+                        <div class="quality-points">
+                            <span class="quality-point q-poor">Poor: 2</span>
+                            <span class="quality-point q-common">Common: 3</span>
+                            <span class="quality-point q-uncommon">Uncommon: 4</span>
+                            <span class="quality-point q-rare">Rare: 5</span>
+                            <span class="quality-point q-epic">Epic: 7</span>
+                            <span class="quality-point q-legendary">Legendary: 12</span>
+                        </div>
+                    </div>
+                    <div class="formula-section">
+                        <span class="formula-title">Level Points</span>
+                        <span class="formula-details">+0.12 per level (max +3 at level 25)</span>
+                    </div>
+                    <div class="formula-section">
+                        <span class="formula-title">Achievement Bonuses</span>
+                        <span class="formula-details">Collection milestones, level 25 counts, family diversity, quality thresholds</span>
+                    </div>
+                </div>
+
+                <p class="disclaimer-small">⚠️ Unofficial fan project · Not affiliated with TauriWoW or Crystalsong staff</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Feedback Toast -->
+    <div class="copy-feedback" id="copyFeedback">✓ Copied to clipboard!</div>
+
+    <!-- Player Collection Modal -->
+    <div id="collectionModal" class="modal" onclick="if(event.target===this)closeModal()">
+        <div class="modal-content">
+            <button class="modal-close" onclick="closeModal()">✕</button>
+            <h2 id="modalTitle">Player Collection</h2>
+            <div id="modalBody">Loading...</div>
+        </div>
+    </div>
+
+    <!-- JavaScript Files -->
+    <script src="js/pet-database.js"></script>
+    <script src="js/config.js"></script>
+    <script src="js/supabase-functions.js"></script>
+    <script src="js/scoring.js"></script>
+    <script src="js/parsers.js"></script>
+    <script src="js/ui.js"></script>
+    <script src="js/app.js"></script>
+</body>
+</html>
