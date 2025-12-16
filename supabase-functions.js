@@ -7,36 +7,26 @@
  */
 async function saveCollectionToSupabase(playerName, realmName, pets, score) {
     try {
-        const { data: existing } = await supabase
+        const { error } = await supabaseClient
             .from('collections')
-            .select('id')
-            .eq('player', playerName)
-            .eq('realm', realmName)
-            .single();
+            .upsert({
+                player: playerName,
+                realm: realmName,
+                pets_data: JSON.stringify(pets),
+                score: score,
+                updated_at: new Date().toISOString()
+            }, {
+                onConflict: 'player,realm'
+            });
 
-        const collectionData = {
-            player: playerName,
-            realm: realmName,
-            pets: pets,
-            score: score,
-            updated_at: new Date().toISOString()
-        };
-
-        let result;
-        if (existing) {
-            result = await supabase
-                .from('collections')
-                .update(collectionData)
-                .eq('id', existing.id);
-        } else {
-            result = await supabase
-                .from('collections')
-                .insert(collectionData);
+        if (error) {
+            console.error('Save error:', error);
+            return false;
         }
-
-        return !result.error;
+        console.log('Collection saved to Supabase');
+        return true;
     } catch (err) {
-        console.error('Failed to save collection:', err);
+        console.error('Save exception:', err);
         return false;
     }
 }
@@ -46,15 +36,20 @@ async function saveCollectionToSupabase(playerName, realmName, pets, score) {
  */
 async function loadCollectionFromSupabase(playerName, realmName) {
     try {
-        const { data, error } = await supabase
+        const { data, error } = await supabaseClient
             .from('collections')
             .select('*')
             .eq('player', playerName)
             .eq('realm', realmName)
             .single();
 
-        return error ? null : data;
+        if (error) {
+            console.log('No saved collection found');
+            return null;
+        }
+        return data;
     } catch (err) {
+        console.error('Load exception:', err);
         return null;
     }
 }
@@ -64,14 +59,19 @@ async function loadCollectionFromSupabase(playerName, realmName) {
  */
 async function fetchLeaderboard() {
     try {
-        const { data, error } = await supabase
-            .from('Leaderboard')
+        const { data, error } = await supabaseClient
+            .from('leaderboard')
             .select('*')
             .order('score', { ascending: false })
             .limit(50);
 
-        return error ? [] : (data || []);
+        if (error) {
+            console.error('Leaderboard fetch error:', error);
+            return [];
+        }
+        return data || [];
     } catch (err) {
+        console.error('Leaderboard exception:', err);
         return [];
     }
 }
@@ -80,141 +80,113 @@ async function fetchLeaderboard() {
  * Submit score to leaderboard
  */
 async function submitScore() {
-    const pb = loadPersonalBest();
-    if (!pb) {
-        alert('Load your collection first!');
+    if (!currentScoreData || !playerData) {
+        alert('Please load your collection first!');
         return;
     }
 
-    const data = currentScoreData ? {
-        player: playerData.playerName,
-        realm: playerData.realmName,
-        score: currentScoreData.total,
-        pets: currentScoreData.stats.uniqueCount,
-        level25: currentScoreData.stats.level25Count,
-        rare: currentScoreData.stats.rareCount,
-        epic: currentScoreData.stats.epicCount
-    } : {
-        player: pb.player,
-        realm: pb.realm,
-        score: pb.score,
-        pets: pb.pets,
-        level25: pb.level25,
-        rare: pb.rare || 0,
-        epic: pb.epic || 0
-    };
+    const playerName = playerData.playerName;
+    const realmName = playerData.realmName;
+    const score = currentScoreData.total;
+    const pets = currentScoreData.stats.uniqueCount;
+    const level25 = currentScoreData.stats.level25Count;
+    const rareCount = currentScoreData.stats.rareCount || 0;
 
-    const collectionId = currentScoreData
-        ? 'c' + Math.abs((data.pets + '-' + data.level25 + '-' + data.score + '-' + data.rare + '-' + data.epic)
-            .split('')
-            .reduce((h, c) => ((h << 5) - h) + c.charCodeAt(0), 0))
-            .toString(36)
-        : null;
-
-    if (!collectionId) {
-        alert('Please reload your collection first!');
-        return;
-    }
-
-    if (!confirm('Submit your score?\n\nPlayer: ' + data.player + '-' + data.realm +
-        '\nScore: ' + data.score.toLocaleString() +
-        '\nPets: ' + data.pets +
-        '\nLevel 25: ' + data.level25)) {
-        return;
-    }
+    // Generate fingerprint from pet data
+    const petList = playerData.pets || [];
+    const sortedPets = petList
+        .map(p => `${p.speciesID || 0}-${p.level || 1}-${p.quality || p.qualityID || 0}`)
+        .sort()
+        .join(',');
+    const fingerprint = btoa(sortedPets).substring(0, 64);
 
     try {
-        const { data: existing } = await supabase
-            .from('Leaderboard')
-            .select('id, score, player, realm')
-            .eq('player', data.player)
-            .maybeSingle();
+        const { data, error } = await supabaseClient
+            .from('leaderboard')
+            .upsert({
+                player: playerName,
+                realm: realmName,
+                score: score,
+                pets: pets,
+                level25: level25,
+                rare_count: rareCount,
+                fingerprint: fingerprint,
+                created_at: new Date().toISOString()
+            }, {
+                onConflict: 'player,realm'
+            });
 
-        if (existing && existing.score > data.score) {
-            alert('Your current leaderboard score (' + existing.score.toLocaleString() + ') is higher or equal!' +
-                (existing.player !== data.player ? '\n(Previously submitted as ' + existing.player + ')' : ''));
+        if (error) {
+            console.error('Submit error:', error);
+            alert('Error submitting score: ' + error.message);
             return;
         }
 
-        let result = await supabase
-            .from('Leaderboard')
-            .upsert({
-                player: data.player,
-                realm: data.realm,
-                score: data.score,
-                pets: data.pets,
-                level25: data.level25,
-                rare: data.rare,
-                epic: data.epic,
-                created_at: new Date()
-            }, {
-                onConflict: 'player'
-            });
-
-        showCopyFeedback();
-        document.getElementById('copyFeedback').textContent = '✓ Score submitted!';
-        await renderLeaderboard();
+        alert('🏆 Score submitted successfully!');
+        renderLeaderboard();
     } catch (err) {
-        alert('Error submitting score: ' + (err.message || 'Unknown error'));
+        console.error('Submit exception:', err);
+        alert('Error submitting score');
     }
 }
 
 /**
- * View player collection in modal
+ * View another player's collection
  */
 async function viewPlayerCollection(playerName, realmName) {
     const modal = document.getElementById('collectionModal');
-    const modalTitle = document.getElementById('modalTitle');
-    const modalBody = document.getElementById('modalBody');
+    const title = document.getElementById('modalTitle');
+    const body = document.getElementById('modalBody');
 
-    modalTitle.textContent = playerName + '-' + realmName + "'s Collection";
-    modalBody.innerHTML = '<div style="text-align:center;padding:40px;color:#888;">Loading collection...</div>';
-    modal.style.display = 'flex';
+    title.textContent = playerName + ' - ' + realmName;
+    body.innerHTML = '<p style="text-align:center;color:#888;">Loading collection...</p>';
+    modal.classList.add('active');
 
-    const collection = await loadCollectionFromSupabase(playerName, realmName);
+    try {
+        const { data, error } = await supabaseClient
+            .from('collections')
+            .select('*')
+            .eq('player', playerName)
+            .eq('realm', realmName)
+            .single();
 
-    if (!collection || !collection.pets || collection.pets.length === 0) {
-        modalBody.innerHTML = '<div style="text-align:center;padding:40px;">' +
-            '<p style="color:#ff6b6b;font-size:1.2em;">❌ Collection not found</p>' +
-            '<p style="color:#888;margin-top:10px;">This player hasn\'t uploaded their collection yet.</p></div>';
-        return;
+        if (error || !data) {
+            body.innerHTML = '<p style="text-align:center;color:#ff6b6b;">Collection not found. Player may not have uploaded their data.</p>';
+            return;
+        }
+
+        const pets = JSON.parse(data.pets_data || '[]');
+        
+        if (pets.length === 0) {
+            body.innerHTML = '<p style="text-align:center;color:#888;">No pets in collection.</p>';
+            return;
+        }
+
+        // Render pets
+        body.innerHTML = '<div class="modal-pet-grid">' +
+            pets.slice(0, 50).map(pet => {
+                const familyId = pet.petType || pet.familyID || 0;
+                const family = families[familyId] || { name: 'Unknown', icon: '❓' };
+                const qualityNum = typeof pet.quality === 'number' ? pet.quality : (pet.qualityID || 0);
+                
+                return '<div class="modal-pet quality-' + qualityNum + '">' +
+                    '<span class="pet-icon">' + family.icon + '</span>' +
+                    '<span class="pet-name">' + (pet.speciesName || 'Unknown') + '</span>' +
+                    '<span class="pet-level">Lv.' + (pet.level || 1) + '</span>' +
+                    '</div>';
+            }).join('') +
+            '</div>' +
+            (pets.length > 50 ? '<p style="text-align:center;color:#888;margin-top:15px;">Showing 50 of ' + pets.length + ' pets</p>' : '');
+
+    } catch (err) {
+        console.error('View collection error:', err);
+        body.innerHTML = '<p style="text-align:center;color:#ff6b6b;">Error loading collection.</p>';
     }
-
-    const pets = collection.pets;
-    let level25 = 0, rareCount = 0, epicCount = 0;
-    const familiesOwned = new Set();
-
-    pets.forEach(pet => {
-        if (pet.level === 25) level25++;
-        if (pet.quality >= 3) rareCount++;
-        if (pet.quality >= 4) epicCount++;
-        if (pet.petType) familiesOwned.add(pet.petType);
-    });
-
-    pets.sort((a, b) => (b.level !== a.level) ? b.level - a.level : b.quality - a.quality);
-
-    modalBody.innerHTML =
-        '<div class="modal-stats">' +
-        '<div class="modal-stat"><div class="value">' + pets.length + '</div><div class="label">Pets</div></div>' +
-        '<div class="modal-stat"><div class="value">' + level25 + '</div><div class="label">Lv 25</div></div>' +
-        '<div class="modal-stat"><div class="value">' + rareCount + '</div><div class="label">Rare+</div></div>' +
-        '<div class="modal-stat"><div class="value">' + familiesOwned.size + '</div><div class="label">Families</div></div>' +
-        '<div class="modal-stat score"><div class="value">' + (collection.score ? collection.score.toLocaleString() : 'N/A') + '</div><div class="label">Score</div></div>' +
-        '</div>' +
-        '<div class="modal-pets">' +
-        pets.slice(0, 50).map(pet => {
-            const qc = ['poor', 'common', 'uncommon', 'rare', 'epic', 'legendary'][pet.quality] || 'common';
-            const fi = families[pet.petType]?.icon || '❓';
-            return '<div class="modal-pet ' + qc + '">' +
-                '<span class="pet-icon">' + fi + '</span>' +
-                '<span class="pet-name">' + (pet.speciesName || 'Unknown') + '</span>' +
-                '<span class="pet-level">Lv ' + pet.level + '</span></div>';
-        }).join('') +
-        (pets.length > 50 ? '<div class="modal-pet more">... and ' + (pets.length - 50) + ' more pets</div>' : '') +
-        '</div>' +
-        '<div class="modal-updated">Last updated: ' + (collection.updated_at ? new Date(collection.updated_at).toLocaleDateString() : 'Unknown') + '</div>';
 }
 
+/**
+ * Close modal
+ */
 function closeModal() {
-    document.getElementById('collectionModal').style.display = 'none';
+    document.getElementById('collectionModal').classList.remove('active');
 }
