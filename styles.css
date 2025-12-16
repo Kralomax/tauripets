@@ -494,7 +494,7 @@ header::after {
 .leaderboard-table .rank-1 { color: #ffd700; text-shadow: 0 0 10px rgba(255, 215, 0, 0.5); }
 .leaderboard-table .rank-2 { color: #c0c0c0; text-shadow: 0 0 10px rgba(192, 192, 192, 0.5); }
 .leaderboard-table .rank-3 { color: #cd7f32; text-shadow: 0 0 10px rgba(205, 127, 50, 0.5); }
-.leaderboard-table .player-name { color: #00ff88; font-weight: bold; text-shadow: 0 0 10px rgba(0, 255, 136, 0.2); }
+.leaderboard-table .player-name { color: #00ff88; font-weight: bold; font-size: 1.05rem; text-shadow: 0 0 10px rgba(0, 255, 136, 0.2); }
 .leaderboard-table .score { color: #ffd700; font-weight: bold; font-size: 1.1rem; text-shadow: 0 0 10px rgba(255, 215, 0, 0.3); }
 .leaderboard-table .date { color: #666; font-size: 0.8rem; }
 
@@ -504,8 +504,8 @@ header::after {
 .trophy { font-size: 1.2rem; margin-right: 5px; }
 
 .player-name.clickable { cursor: pointer; transition: all 0.2s ease; position: relative; }
-.player-name.clickable:hover { color: #00ff88; text-shadow: 0 0 10px rgba(0, 255, 136, 0.5); }
-.player-name .view-icon { opacity: 0; margin-left: 5px; transition: opacity 0.2s; }
+.player-name.clickable:hover { color: #00ffaa !important; text-shadow: 0 0 15px rgba(0, 255, 136, 0.8); transform: scale(1.02); }
+.player-name .view-icon { opacity: 0; margin-left: 8px; font-size: 1rem; transition: opacity 0.2s; }
 .player-name.clickable:hover .view-icon { opacity: 1; }
 
 /* How It Works & Scoring Formula */
