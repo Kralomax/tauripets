@@ -5,7 +5,14 @@
 // Supabase Configuration
 const SUPABASE_URL = 'https://yxendhrzacondoyzfzlf.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl4ZW5kaHJ6YWNvbmRveXpmemxmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU0OTM2OTcsImV4cCI6MjA4MTA2OTY5N30.Pa2CA_AaB2GPAgKWmuUVyB7be1xTLUxqriy1iSO8b4g';
-const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+// Only create supabase client if it doesn't exist
+let supabaseClient;
+if (typeof supabase !== 'undefined') {
+    supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+} else if (typeof window.supabase !== 'undefined') {
+    supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+}
 
 // Pet Family Data
 const families = {
