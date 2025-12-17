@@ -246,6 +246,27 @@ async function viewPlayerCollection(playerName, realmName) {
 
     pets.sort((a, b) => (b.level !== a.level) ? b.level - a.level : b.quality - a.quality);
 
+    // Comparison logic - find pets they have that you don't
+    let comparisonHTML = '';
+    if (ownedSpeciesIDs.size > 0) {
+        const theirPetIDs = new Set(pets.map(p => p.speciesID));
+        const yourPetIDs = ownedSpeciesIDs;
+        
+        const theyHaveYouDont = pets.filter(p => !yourPetIDs.has(p.speciesID));
+        const youHaveTheyDont = [...yourPetIDs].filter(id => !theirPetIDs.has(id));
+        
+        comparisonHTML = '<div class="comparison-section">' +
+            '<h4 style="color:#ffaa00;margin:10px 0;">📊 Comparison</h4>' +
+            '<div style="display:flex;gap:20px;margin:10px 0;">' +
+            '<div class="comparison-stat"><span class="value" style="color:#ff6b6b;">' + theyHaveYouDont.length + '</span> pets they have that you don\'t</div>' +
+            '<div class="comparison-stat"><span class="value" style="color:#00ff88;">' + youHaveTheyDont.length + '</span> pets you have that they don\'t</div>' +
+            '</div>' +
+            (theyHaveYouDont.length > 0 ? 
+                '<button class="modal-btn" onclick="showMissingPetsFromPlayer(\'' + playerName + '\', \'' + realmName + '\')" style="margin-top:10px;">🔍 Show Pets You\'re Missing</button>' 
+                : '') +
+            '</div>';
+    }
+
     modalBody.innerHTML =
         '<div class="modal-stats">' +
         '<div class="modal-stat"><div class="value">' + pets.length + '</div><div class="label">Pets</div></div>' +
@@ -254,6 +275,7 @@ async function viewPlayerCollection(playerName, realmName) {
         '<div class="modal-stat"><div class="value">' + familiesOwned.size + '</div><div class="label">Families</div></div>' +
         '<div class="modal-stat score"><div class="value">' + (collection.score ? collection.score.toLocaleString() : 'N/A') + '</div><div class="label">Score</div></div>' +
         '</div>' +
+        comparisonHTML +
         '<div class="modal-pets">' +
         pets.slice(0, 50).map(pet => {
             const qc = ['poor', 'common', 'uncommon', 'rare', 'epic', 'legendary'][pet.quality] || 'common';
@@ -270,4 +292,49 @@ async function viewPlayerCollection(playerName, realmName) {
 
 function closeModal() {
     document.getElementById('collectionModal').style.display = 'none';
+}
+
+/**
+ * Show pets that another player has but you don't
+ */
+async function showMissingPetsFromPlayer(playerName, realmName) {
+    const collection = await loadCollectionFromSupabase(playerName, realmName);
+    if (!collection || !collection.pets) return;
+    
+    const theirPets = collection.pets.filter(p => !ownedSpeciesIDs.has(p.speciesID));
+    
+    if (theirPets.length === 0) {
+        alert('You have all the pets they have!');
+        return;
+    }
+    
+    const modalBody = document.getElementById('modalBody');
+    const modalTitle = document.getElementById('modalTitle');
+    
+    modalTitle.textContent = 'Pets ' + playerName + ' has that you don\'t (' + theirPets.length + ')';
+    
+    theirPets.sort((a, b) => {
+        if (a.speciesName && b.speciesName) return a.speciesName.localeCompare(b.speciesName);
+        return 0;
+    });
+    
+    modalBody.innerHTML = '<div class="modal-missing-pets">' +
+        theirPets.map(pet => {
+            const qc = ['poor', 'common', 'uncommon', 'rare', 'epic', 'legendary'][pet.quality] || 'common';
+            const fi = families[pet.petType]?.icon || '❓';
+            
+            // Find this pet in the database to get source info
+            const dbPet = ALL_PETS_DATABASE.find(p => p.speciesID === pet.speciesID);
+            const sourceInfo = dbPet ? (dbPet.sourceText || dbPet.zone || 'Unknown') : 'Unknown';
+            
+            return '<div class="modal-pet missing-highlight ' + qc + '">' +
+                '<span class="pet-icon">' + fi + '</span>' +
+                '<div class="pet-details-column">' +
+                '<span class="pet-name">' + (pet.speciesName || 'Unknown') + '</span>' +
+                '<span class="pet-source">📍 ' + sourceInfo + '</span>' +
+                '</div>' +
+                '<span class="pet-level">Lv ' + pet.level + '</span></div>';
+        }).join('') +
+        '</div>' +
+        '<button class="modal-btn" onclick="viewPlayerCollection(\'' + playerName + '\', \'' + realmName + '\')" style="margin-top:15px;">← Back to Full Collection</button>';
 }
