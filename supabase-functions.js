@@ -159,7 +159,7 @@ async function submitScore() {
                 collection_id: collectionId,
                 created_at: new Date()
             }, {
-                onConflict: 'player,realm'
+                onConflict: 'player'
             });
 
         console.log('Upsert result:', result);
