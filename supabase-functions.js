@@ -119,8 +119,9 @@ async function submitScore() {
 
     try {
         console.log('Collection ID:', collectionId);
+        console.log('Current player:', data.player);
         
-        // Check if this exact collection already exists (prevents same account, different character)
+        // FIRST: Check if this exact collection already exists under a different character (prevents multi-char submissions)
         const { data: duplicateCheck } = await supabaseClient
             .from('Leaderboard')
             .select('id, score, player, realm, collection_id')
@@ -128,17 +129,28 @@ async function submitScore() {
             .maybeSingle();
 
         console.log('Duplicate check result:', duplicateCheck);
-        console.log('Current player:', data.player);
 
-        if (duplicateCheck && duplicateCheck.player !== data.player) {
-            alert('⚠️ This collection is already on the leaderboard!\n\n' +
-                'Submitted as: ' + duplicateCheck.player + '-' + duplicateCheck.realm + '\n' +
-                'Score: ' + duplicateCheck.score.toLocaleString() + '\n\n' +
-                'You can only submit one character per account.');
-            return;
+        if (duplicateCheck) {
+            if (duplicateCheck.player !== data.player) {
+                // Same collection, different character name - ASK TO REPLACE
+                if (!confirm('⚠️ This collection is already on the leaderboard as:\n\n' +
+                    duplicateCheck.player + '-' + duplicateCheck.realm + ' (Score: ' + duplicateCheck.score.toLocaleString() + ')\n\n' +
+                    'Replace with ' + data.player + '-' + data.realm + '?')) {
+                    return;
+                }
+                
+                // Delete the old entry
+                await supabaseClient
+                    .from('Leaderboard')
+                    .delete()
+                    .eq('id', duplicateCheck.id);
+                
+                console.log('Deleted old entry for:', duplicateCheck.player);
+            }
+            // If it's the same player name, allow it (they're updating their own score)
         }
 
-        // Check if this player already has a score
+        // SECOND: Check if this specific player already has a score
         const { data: existing } = await supabaseClient
             .from('Leaderboard')
             .select('id, score, player, realm, collection_id')
