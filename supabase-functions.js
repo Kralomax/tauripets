@@ -87,13 +87,12 @@ async function fetchLeaderboard() {
  * Submit score to leaderboard
  */
 async function submitScore() {
-    const pb = loadPersonalBest();
-    if (!pb) {
-        alert('Load your collection first!');
+    if (!currentScoreData || !playerData) {
+        alert('Please load your collection first!');
         return;
     }
 
-    const data = currentScoreData ? {
+    const data = {
         player: playerData.playerName,
         realm: playerData.realmName,
         score: currentScoreData.total,
@@ -101,27 +100,15 @@ async function submitScore() {
         level25: currentScoreData.stats.level25Count,
         rare: currentScoreData.stats.rareCount,
         epic: currentScoreData.stats.epicCount
-    } : {
-        player: pb.player,
-        realm: pb.realm,
-        score: pb.score,
-        pets: pb.pets,
-        level25: pb.level25,
-        rare: pb.rare || 0,
-        epic: pb.epic || 0
     };
 
-    const collectionId = currentScoreData
-        ? 'c' + Math.abs((data.pets + '-' + data.level25 + '-' + data.score + '-' + data.rare + '-' + data.epic)
-            .split('')
-            .reduce((h, c) => ((h << 5) - h) + c.charCodeAt(0), 0))
-            .toString(36)
-        : null;
-
-    if (!collectionId) {
-        alert('Please reload your collection first!');
-        return;
-    }
+    // Generate collection fingerprint from pet data
+    const petList = playerData.pets || [];
+    const sortedPets = petList
+        .map(p => `${p.speciesID || 0}-${p.level || 1}-${(typeof p.quality === 'number' ? p.quality : (p.qualityID || 0))}`)
+        .sort()
+        .join(',');
+    const collectionId = btoa(sortedPets).substring(0, 64);
 
     if (!confirm('Submit your score?\n\nPlayer: ' + data.player + '-' + data.realm +
         '\nScore: ' + data.score.toLocaleString() +
@@ -131,15 +118,31 @@ async function submitScore() {
     }
 
     try {
-        const { data: existing } = await supabaseClient
+        // Check if this exact collection already exists (prevents same account, different character)
+        const { data: duplicateCheck } = await supabaseClient
             .from('Leaderboard')
-            .select('id, score, player, realm')
-            .eq('player', data.player)
+            .select('id, score, player, realm, collection_id')
+            .eq('collection_id', collectionId)
             .maybeSingle();
 
-        if (existing && existing.score > data.score) {
-            alert('Your current leaderboard score (' + existing.score.toLocaleString() + ') is higher or equal!' +
-                (existing.player !== data.player ? '\n(Previously submitted as ' + existing.player + ')' : ''));
+        if (duplicateCheck && duplicateCheck.player !== data.player) {
+            alert('⚠️ This collection is already on the leaderboard!\n\n' +
+                'Submitted as: ' + duplicateCheck.player + '-' + duplicateCheck.realm + '\n' +
+                'Score: ' + duplicateCheck.score.toLocaleString() + '\n\n' +
+                'You can only submit one character per account.');
+            return;
+        }
+
+        // Check if this player already has a score
+        const { data: existing } = await supabaseClient
+            .from('Leaderboard')
+            .select('id, score, player, realm, collection_id')
+            .eq('player', data.player)
+            .eq('realm', data.realm)
+            .maybeSingle();
+
+        if (existing && existing.score >= data.score) {
+            alert('Your current leaderboard score (' + existing.score.toLocaleString() + ') is higher or equal!');
             return;
         }
 
@@ -153,9 +156,10 @@ async function submitScore() {
                 level25: data.level25,
                 rare: data.rare,
                 epic: data.epic,
+                collection_id: collectionId,
                 created_at: new Date()
             }, {
-                onConflict: 'player'
+                onConflict: 'player,realm'
             });
 
         console.log('Upsert result:', result);
