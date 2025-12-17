@@ -725,6 +725,16 @@ header::after {
     box-shadow: 0 5px 20px rgba(0, 255, 136, 0.4);
 }
 
+.modal-btn.show-more-btn {
+    width: 100%;
+    background: linear-gradient(135deg, #ffaa00, #ff8800);
+    color: #1a1a2e;
+}
+
+.modal-btn.show-more-btn:hover {
+    box-shadow: 0 5px 20px rgba(255, 170, 0, 0.4);
+}
+
 .modal-missing-pets {
     display: flex;
     flex-direction: column;
