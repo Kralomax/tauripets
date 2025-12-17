@@ -19,7 +19,6 @@ function loadPersonalBest() {
  */
 function savePersonalBest(scoreData, playerName, realmName) {
     try {
-        const current = loadPersonalBest();
         const newEntry = {
             player: playerName,
             realm: realmName,
@@ -32,12 +31,9 @@ function savePersonalBest(scoreData, playerName, realmName) {
             timestamp: Date.now()
         };
 
-        if (!current || newEntry.score > current.score) {
-            localStorage.setItem('tauripets_personal_best', JSON.stringify(newEntry));
-            return { saved: true, isNewBest: true, entry: newEntry };
-        }
-
-        return { saved: false, isNewBest: false, entry: current };
+        // Always save the current character (not just if it's a higher score)
+        localStorage.setItem('tauripets_personal_best', JSON.stringify(newEntry));
+        return { saved: true, isNewBest: true, entry: newEntry };
     } catch (e) {
         return { saved: false, isNewBest: false, entry: null };
     }
