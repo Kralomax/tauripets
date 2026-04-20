@@ -1,4 +1,57 @@
-// =====================================================
+```javascript
+// ============================================================================
+// ANTI-CHEAT: Signature Verification
+// ============================================================================
+
+const SECRET_KEY = "TauriPets_Evermoon_2026_SecretKey_LegionPets";
+
+function simpleHash(str) {
+    let hash = 2166136261;
+    for (let i = 0; i < str.length; i++) {
+        hash ^= str.charCodeAt(i);
+        hash = Math.imul(hash, 16777619);
+        hash = hash >>> 0;
+    }
+    return hash.toString(16).padStart(8, '0');
+}
+
+function generateSignature(data) {
+    const combined = data + SECRET_KEY;
+    return simpleHash(combined);
+}
+
+function verifyDataSignature(rawText) {
+    const lines = rawText.trim().split('\n');
+    const lastLine = lines[lines.length - 1];
+    
+    if (!lastLine.startsWith('SIGNATURE:')) {
+        return {
+            valid: false,
+            error: "Missing signature. Please use the latest addon version.",
+            data: null
+        };
+    }
+    
+    const providedSignature = lastLine.substring(10);
+    const dataLines = lines.slice(0, -1);
+    const actualData = dataLines.join('\n');
+    const expectedSignature = generateSignature(actualData);
+    
+    if (providedSignature !== expectedSignature) {
+        return {
+            valid: false,
+            error: "Data verification failed. The collection data has been modified or corrupted.",
+            data: null
+        };
+    }
+    
+    return {
+        valid: true,
+        error: null,
+        data: actualData
+    };
+}
+```// =====================================================
 // TauriPets - Data Parsers (Lua & Copy Format)
 // =====================================================
 
