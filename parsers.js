@@ -1,4 +1,3 @@
-```javascript
 // ============================================================================
 // ANTI-CHEAT: Signature Verification
 // ============================================================================
@@ -51,7 +50,8 @@ function verifyDataSignature(rawText) {
         data: actualData
     };
 }
-```// =====================================================
+
+// =====================================================
 // TauriPets - Data Parsers (Lua & Copy Format)
 // =====================================================
 
@@ -219,6 +219,7 @@ function processFile(file) {
 
     reader.readAsText(file);
 }
+
 /**
  * Process pasted data
  */
@@ -245,48 +246,6 @@ function processPastedData() {
             
         } else if (text.includes('TauriPetsDB') || text.includes('TauriPetsGUI_Export')) {
             // Lua files don't have signatures
-            playerData = parseLuaFile(text);
-        } else {
-            throw new Error('Unrecognized format.');
-        }
-
-        ownedSpeciesIDs.clear();
-        if (playerData.pets) {
-            playerData.pets.forEach(pet => {
-                if (pet.speciesID) ownedSpeciesIDs.add(pet.speciesID);
-            });
-        }
-
-        displayMyCollection();
-        renderAllPets();
-
-        // Save to Supabase
-        if (playerData.playerName && playerData.pets.length > 0) {
-            const score = currentScoreData ? currentScoreData.total : 0;
-            saveCollectionToSupabase(playerData.playerName, playerData.realmName, playerData.pets, score);
-        }
-
-        document.getElementById('pasteInput').value = '';
-    } catch (err) {
-        alert('Error parsing data: ' + err.message);
-    }
-}
-
-/**
- * Process pasted data
- */
-function processPastedData() {
-    const text = document.getElementById('pasteInput').value.trim();
-
-    if (!text) {
-        alert('Please paste your TauriPets data first!');
-        return;
-    }
-
-    try {
-        if (text.startsWith('TAURIPETS:')) {
-            playerData = parseCopyFormat(text);
-        } else if (text.includes('TauriPetsDB') || text.includes('TauriPetsGUI_Export')) {
             playerData = parseLuaFile(text);
         } else {
             throw new Error('Unrecognized format.');
